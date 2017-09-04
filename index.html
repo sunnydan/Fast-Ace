@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>Fast Ace</title>
+  <meta charset="utf-8">
+  <meta name="description" content="">
+  <meta name="keywords" content="">
+  <meta name="author" content="Daniel Hilla">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      margin: 0px;
+      padding: 0px;
+      position: fixed;
+      overflow-y: scroll;
+      width: 100%;
+    }
+
+    #game {
+      position: relative;
+      background-image: url('cloud1.jpg');
+    }
+
+    #fighter {
+      position: absolute;
+      z-index: 1;
+    }
+
+    .enemy {
+      position: absolute;
+      z-index: 1;
+    }
+
+    .bullet {
+      position: absolute;
+    }
+
+    .left {
+      transform: rotate(-15deg);
+    }
+
+    .right {
+      transform: rotate(15deg) scaleX(-1);
+    }
+
+    .explosion {
+      position: absolute;
+    }
+
+    .scrollingBack {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <script src="1942classes.js" type="javascript"></script>
+  <script src="main.js" type="javascript"></script>
+  <script>
+    console.log($);
+    $(document).ready(function () {
+
+      var playmusic = true;
+      var gamemusic = new Audio('Fast Ace.wav');
+      var shoot1 = new Audio("shoot1.wav");
+      var shoot2 = new Audio("shoot2.mp3");
+      var explosion1 = new Audio("explosion1.wav");
+      var explosion2 = new Audio("explosion2.wav");
+
+      gamemusic.addEventListener('ended', function () {
+        this.currentTime = 0;
+        if (playmusic) {
+          this.play();
+        }
+      }, false);
+      gamemusic.play();
+
+      function fastPlayAudio(file) {
+        var audio = document.createElement("audio");
+        audio.src = file;
+        audio.addEventListener("ended", function () {
+          document.removeChild(this);
+        }, false);
+        audio.play();
+      }
+
+      var id = 0;
+      var backgroundPos = 0;
+      var keyDown = [];
+      var keyDownTime = []
+      var goodbullets = [];
+      var badbullets = [];
+      var enemies = [];
+      var time = 0;
+      var score = 0;
+
+      function assignID() {
+        id += 1;
+        return "ID" + id;
+      }
+
+      function getIDNumber(id1) {
+        return id1.substring(2);
+      }
+
+
+      function heightInPercent(element) {
+        var height = element.height();
+        var parentheight = element.offsetParent().height();
+        return 100 * height / parentheight;
+      }
+
+      function checkCollision(thing1, thing2) {
+        if (thing1.elementX < thing2.elementX + thing2.width &&
+          thing1.elementX + thing1.width > thing2.elementX &&
+          thing1.elementY < thing2.elementY + thing2.elementH &&
+          thing1.elementY + thing1.elementH > thing2.elementY) {
+          return true;
+        }
+        return false;
+      }
+
+      class Fighter {
+        constructor(x, y) {
+          this.x = x;
+          this.y = y;
+          this.health = 50;
+          this.going = "straight";
+          this.width = 4;
+        }
+
+        get elementH() {
+          return heightInPercent($("#fighter"));
+        }
+
+        get elementX() {
+          return this.x - this.width / 2;
+        }
+
+        get elementY() {
+          return this.y - this.elementH / 2;
+        }
+
+        get html() {
+          switch (this.going) {
+            case "straight":
+              return "<img id='fighter' src='fighter.png' style='width: " + this.width + "%; left: " +
+                this.elementX + "%; top: " + this.elementY + "%;'>";
+              break;
+            case "left":
+              return "<img id='fighter' class='left' src='fighterturning.png' style='width: " + this.width + "%; left: " +
+                this.elementX + "%; top: " + this.elementY + "%;'>";
+              break;
+            case "right":
+              return "<img id='fighter' class='right' src='fighterturning.png' style='width: " + this.width + "%; left: " +
+                this.elementX + "%; top: " + this.elementY + "%;'>";
+              break;
+          }
+        }
+
+        shoot() {
+          new Bullet(1, this.x, this.y);
+          fastPlayAudio("shoot1.wav");
+        }
+      }
+
+      var fighter = new Fighter(50, 50);
+
+      class Enemy {
+        constructor(type, x, y) {
+          this.id = assignID();
+          this.type = type;
+          this.x = x;
+          this.y = y;
+          switch (type) {
+            case 1:
+              this.xspeed = 0.1;
+              this.yspeed = 0.1;
+              this.health = 1;
+              this.width = 4;
+              this.points = 1;
+              break;
+            case 2:
+              this.xspeed = 0.05;
+              this.yspeed = 0.01;
+              this.health = 3;
+              this.width = 5;
+              this.points = 5;
+              break;
+            case 3:
+              this.xspeed = 0.03;
+              this.yspeed = 0.02;
+              this.health = 7;
+              this.width = 6;
+              this.points = 25;
+              break;
+            case 4:
+              this.xspeed = 0.01;
+              this.yspeed = 0.005;
+              this.health = 15;
+              this.width = 10;
+              this.points = 50;
+              break;
+          }
+          enemies.push(this);
+        }
+
+        get elementH() {
+          return heightInPercent($("#" + this.id));
+        }
+
+        get elementX() {
+          var a = this.x - this.width / 2;
+          if (a) {
+            return a
+          }
+          return -30;
+        }
+
+        get elementY() {
+          var a = this.y - this.elementH / 2;
+          if (a) {
+            return a;
+          }
+          return -30;
+        }
+
+        get html() {
+          return "<img id='" + this.id + "' class='enemy enemy" + this.type + "' src='enemy" + this.type + ".png' style='width: " + this.width + "%; left: " +
+            this.elementX + "%; top: " + this.elementY + "%;'>";
+        }
+
+        move() {
+          var diffx = fighter.x - this.x;
+          var diffy = fighter.y - this.y;
+          if (diffx > this.xspeed) {
+            this.x += this.xspeed;
+          }
+          else if (diffx > 0) {
+            this.x += 0.001;
+          }
+          else if (diffx < -this.xspeed) {
+            this.x -= this.xspeed;
+          }
+          else {
+            this.x -= 0.001;
+          }
+          if (diffy > this.yspeed) {
+            this.y += this.yspeed;
+          }
+          else if (diffy > 0) {
+            this.y += 0.001;
+          }
+          else if (diffy < -this.yspeed) {
+            this.y -= this.yspeed;
+          }
+          else {
+            this.y -= 0.001;
+          }
+        }
+
+        shoot() {
+          switch (this.type) {
+            case 2:
+              if (time % 120 == 0) {
+                new Bullet(2, this.x, this.y);
+                fastPlayAudio("shoot2.mp3");
+              }
+              break;
+            case 3:
+              if (time % 200 == 0) {
+                new Bullet(2, this.x, this.y - this.elementH/2);
+                new Bullet(2, this.x, this.y);
+                new Bullet(2, this.x, this.y + this.elementH/2);
+                fastPlayAudio("shoot2.mp3");
+              }
+              break;
+            case 4:
+            if (time % 250 == 0) {
+                new Bullet(2, this.x - 2*this.width/5, this.y - 6);
+                new Bullet(2, this.x - this.width/5, this.y - 3);
+                new Bullet(2, this.x, this.y);
+                new Bullet(2, this.x + this.width/5, this.y - 3);
+                new Bullet(2, this.x + 2*this.width/5, this.y - 6);
+                fastPlayAudio("shoot2.mp3");
+              }
+              break;
+          }
+        }
+      }
+
+      class Bullet {
+        constructor(type, x, y) {
+          this.id = assignID();
+          this.type = type;
+          this.x = x;
+          this.y = y;
+          this.width = 1;
+          if (type == 1) {
+            goodbullets.push(this);
+          }
+          else {
+            badbullets.push(this);
+          }
+        }
+
+        get elementH() {
+          return heightInPercent($("#" + this.id));
+        }
+
+        get elementX() {
+          var a = this.x - this.width / 2;
+          if (a) {
+            return a
+          }
+          return -30;
+        }
+
+        get elementY() {
+          var a = this.y - this.elementH / 2;
+          if (a) {
+            return a;
+          }
+          return -30;
+        }
+
+        get html() {
+          if (this.type == 1) {
+            return "<img id='" + this.id + "' class='bullet' src='fighterbullet.png' style='width: " + this.width + "%; left: " +
+              this.elementX + "%; top: " + this.elementY + "%;'>";
+          }
+          else {
+            return "<img id='" + this.id + "' class='bullet' src='enemybullet.png' style='width: " + this.width + "%; left: " +
+              this.elementX + "%; top: " + this.elementY + "%;'>";
+          }
+        }
+      }
+
+      $(document).keydown(function (e) {
+        keyDown[e.keyCode] = true;
+        if (!(typeof keyDownTime[e.keyCode] == "number")) {
+          keyDownTime[e.keyCode] = 0;
+        }
+        e.preventDefault(); // prevent the default action (scroll / move caret)
+      });
+
+      $(document).keyup(function (e) {
+        keyDown[e.keyCode] = false;
+        keyDownTime[e.keyCode] = "null";
+        e.preventDefault(); // prevent the default action (scroll / move caret)
+      });
+
+      function updateKeyDownTime(keycode) {
+
+      }
+
+      function update() {
+        if (fighter.health <= 0) {
+          fastPlayAudio("explosion4.flac");
+          clearInterval(gameloop);
+          playmusic = false;
+        }
+
+        var html = "";
+        time += 1;
+
+        if (time % 150 == 0 && enemies.length < 7) {
+          var enemytype = 1;
+          switch (Math.floor(Math.random() * 11) + 1) {
+            case 1:
+              enemytype = 4;
+              break;
+            case 2:
+            case 3:
+              enemytype = 3;
+              break;
+            case 4:
+            case 5:
+            case 6:
+              enemytype = 2;
+              break;
+            default:
+              enemytype = 1;
+          }
+          var enemy = new Enemy(enemytype, Math.floor(Math.random() * 101), 0);
+        }
+
+        if (keyDown[37]) { //left
+          keyDownTime[37] += 1;
+          fighter.x -= 0.2;
+          if (fighter.x < 0) {
+            fighter.x = 100;
+          }
+          fighter.going = "left";
+        } else if (keyDown[39]) { //right
+          fighter.x += 0.2;
+          if (fighter.x > 100) {
+            fighter.x = 0;
+          }
+          fighter.going = "right";
+        } else {
+          fighter.going = "straight";
+        }
+        if (keyDown[38]) { //up
+          fighter.y -= 0.2;
+        } else if (keyDown[40]) { //down
+          fighter.y += 0.2;
+        }
+        html += fighter.html;
+
+        if (keyDown[32]) {
+          if (keyDownTime[32] % 25 == 0) {
+            fighter.shoot();
+          }
+          keyDownTime[32] += 1;
+        }
+
+        for (var i = 0; i < enemies.length; i++) {
+          var enemy = enemies[i];
+          if (checkCollision(enemy, fighter)) {
+            enemies.splice(i, 1);
+            fastPlayAudio("explosion3.mp3");
+            fighter.health -= 25;
+          }
+          enemy.move();
+          html += enemy.html;
+          enemy.shoot();
+        }
+
+        for (var i = 0; i < goodbullets.length; i++) {
+          var bullet = goodbullets[i];
+          for (var j = 0; j < enemies.length; j++) {
+            if (checkCollision(bullet, enemies[j])) {
+              enemies[j].health -= 1;
+              if (enemies[j].health == 0) {
+                score += enemies[j].points;
+                enemies.splice(j, 1);
+                fastPlayAudio("explosion3.mp3");
+              }
+              fastPlayAudio("explosion1.wav");
+              goodbullets.splice(i, 1);
+              continue;
+            }
+
+          }
+          html += bullet.html;
+          bullet.y -= 0.3;
+          if (bullet.y > 100 || bullet.y < 0) {
+            goodbullets.splice(i, 1);
+          }
+        }
+
+        for (var i = 0; i < badbullets.length; i++) {
+          var bullet = badbullets[i];
+          if (checkCollision(bullet, fighter)) {
+            fighter.health -= 1;
+            fastPlayAudio("explosion1.wav");
+            badbullets.splice(i, 1);
+            continue;
+          }
+
+          html += bullet.html;
+          bullet.y += 0.25;
+          if (bullet.y > 100 || bullet.y < 0) {
+            badbullets.splice(i, 1);
+          }
+        }
+        html += "<span>Health:" + fighter.health + "</span>";
+        html += "<br>"
+        html += "<span>Score:" + score + "</span>";
+
+        $("#game").html(html);
+        $("#game").css({ "height": window.innerHeight + "px" });
+        backgroundPos += 1.5;
+        $('#game').css('background-position', "0 " + backgroundPos + 'px');
+      }
+
+      var gameloop = setInterval(function () { update(); }, 10);
+      update();
+    });
+  </script>
+</head>
+
+<body>
+  <div id="game"></div>
+</body>
+
+</html>
